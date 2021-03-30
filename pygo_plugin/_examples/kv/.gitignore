@@ -1,0 +1,9 @@
+*.store
+kv_plugin_go/kv_plugin_go
+kv_plugin_cpp/kv_plugin_cpp
+kv_plugin_cpp/Makefile
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+*.so
+*.a
