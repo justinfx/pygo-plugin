@@ -61,6 +61,12 @@ reattach.
 
 ## Roadmap
 
+This project is in early stages as is currently considered "alpha". 
+
+* [ ] Tests
+* [ ] Documentation 
+* [ ] Additional examples 
+
 Feature parity with [hashicorp/go-plugin](https://github.com/hashicorp/go-plugin):
 
 * [X] `Client` and related python API classes wrap `hashicorp/go-plugin` for initial host support
