@@ -125,9 +125,13 @@ After these tools are available, the build script will be able to generate bindi
 generation.
 
 ```
-python setup.py build
+# Install python dependencies.
+pip install -r requirements.txt
 
-# to hack on the source
+# Install pygo
+python setup.py install
+
+# or... to hack on the source
 python setup.py develop  
 ```
 
