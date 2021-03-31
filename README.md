@@ -63,9 +63,9 @@ reattach.
 
 This project is in early stages as is currently considered "alpha". 
 
-* [ ] Tests
-* [ ] Documentation 
-* [ ] Additional examples 
+* [ ] Tests ([#3](https://github.com/justinfx/pygo-plugin/issues/3))
+* [ ] Documentation ([#4](https://github.com/justinfx/pygo-plugin/issues/4))
+* [ ] Additional examples ([#5](https://github.com/justinfx/pygo-plugin/issues/5)) 
 
 Feature parity with [hashicorp/go-plugin](https://github.com/hashicorp/go-plugin):
 
@@ -74,20 +74,20 @@ Feature parity with [hashicorp/go-plugin](https://github.com/hashicorp/go-plugin
 * [X] Vendored go-plugin server proto files
 * [X] Server reflection and controller service (graceful shutdown)
 * [X] Server min/max TCP port support
-* [ ] **Bidirectional communication:** Because the plugin system supports
+* [ ] **Bidirectional communication:** ([#11](https://github.com/justinfx/pygo-plugin/issues/11)) Because the plugin system supports
   complex arguments, the host process can send it interface implementations, and the 
   plugin can call back into the host process.
-* [ ] **Stdout/Stderr Syncing**: While plugins are subprocesses, they can continue
+* [ ] **Stdout/Stderr Syncing**: ([#7](https://github.com/justinfx/pygo-plugin/issues/7)) While plugins are subprocesses, they can continue
   to use stdout/stderr as usual, and the output will get mirrored back to
   the host process. The host process can control what `io.Writer` these
   streams go to prevent this from happening.
-* [ ] **Cryptographically Secure Plugins**: Plugins can be verified with an expected
+* [ ] **Cryptographically Secure Plugins**: ([#9](https://github.com/justinfx/pygo-plugin/issues/9)) Plugins can be verified with an expected
   checksum and RPC communications can be configured to use TLS. The host process
   must be properly secured to protect this configuration.
-* [ ] Implement the stdio RPC service for python plugins
-* [ ] Support TLS connections for host client, and in python plugins
-* [ ] Support Auto mTLS feature in python plugins
-* [ ] Support versioned plugins check in python plugins
+* [ ] Implement the stdio RPC service for python plugins ([#7](https://github.com/justinfx/pygo-plugin/issues/7))
+* [ ] Support TLS connections for host client, and in python plugins ([#9](https://github.com/justinfx/pygo-plugin/issues/9))
+* [ ] Support Auto mTLS feature in python plugins ([#8](https://github.com/justinfx/pygo-plugin/issues/8))
+* [ ] Support versioned plugins check in python plugins ([#10](https://github.com/justinfx/pygo-plugin/issues/10))
 
 ## Architecture
 
