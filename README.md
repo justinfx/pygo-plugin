@@ -61,6 +61,12 @@ reattach.
 
 ## Roadmap
 
+This project is in early stages as is currently considered "alpha". 
+
+* [ ] Tests
+* [ ] Documentation 
+* [ ] Additional examples 
+
 Feature parity with [hashicorp/go-plugin](https://github.com/hashicorp/go-plugin):
 
 * [X] `Client` and related python API classes wrap `hashicorp/go-plugin` for initial host support
@@ -119,9 +125,13 @@ After these tools are available, the build script will be able to generate bindi
 generation.
 
 ```
-python setup.py build
+# Install python dependencies.
+pip install -r requirements.txt
 
-# to hack on the source
+# Install pygo
+python setup.py install
+
+# or... to hack on the source
 python setup.py develop  
 ```
 
