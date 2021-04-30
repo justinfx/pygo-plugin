@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package testplugin;
+
+message SumRequest {
+  int64 a = 1;
+  int64 b = 2;
+}
+
+message SumResponse {
+  int64 result = 1;
+}
+
+service Calc {
+  rpc sum(SumRequest) returns (SumResponse);
+}

@@ -8,6 +8,9 @@ import (
 	"time"
 
 	plugin "github.com/hashicorp/go-plugin"
+
+	// keep dependency in go.mod
+	_ "github.com/go-python/gopy/gopyh"
 )
 
 // generate interfaces into classes in python
