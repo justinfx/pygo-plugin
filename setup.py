@@ -108,7 +108,7 @@ setup(
         'pygo_plugin.proto': 'src/pygo_plugin/proto',
     },
     package_data={
-        'pygo_plugin._goplugin': ['*.so', '*.dylib'],
+        'pygo_plugin._goplugin': ['*.so', '_*.so', '*.dylib', '_*.dylib'],
         'pygo_plugin.proto': ['*.py', '*.proto', '*.go-plugin'],
     },
     exclude_package_data={'pygo_plugin._goplugin': ['build.py']},
