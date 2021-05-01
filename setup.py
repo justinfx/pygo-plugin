@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from setuptools import Command
 from distutils.command.build_py import build_py
 from distutils.core import setup
 from distutils.errors import DistutilsExecError
@@ -7,7 +8,6 @@ from distutils.spawn import find_executable
 import glob
 import os
 import pkg_resources
-from setuptools import Command
 import sys
 
 
@@ -39,7 +39,7 @@ class GopyGenTool(Command):
             '-name=goplugin',
             '-no-make=true',
             # '-symbols=false',  # slightly smaller binary if enabled
-            '-output', os.path.join(ROOT, 'pygo_plugin/_goplugin'),
+            '-output', os.path.join(ROOT, 'src/pygo_plugin/_goplugin'),
             '-vm', sys.executable,
             '-rename',
             os.path.join(ROOT, 'go_plugin'),
@@ -66,13 +66,13 @@ class GrpcGenTool(Command):
 
         proto_include = pkg_resources.resource_filename('grpc_tools', '_proto')
 
-        for proto in glob.glob(os.path.join(ROOT, 'pygo_plugin/proto/*.proto')):
+        for proto in glob.glob(os.path.join(ROOT, 'src/pygo_plugin/proto/*.proto')):
             grpc_tools.protoc.main([
                 'grpc_tools.protoc',
                 '-I{}'.format(proto_include),
-                '-I{}'.format(ROOT),
-                '--python_out=.',
-                '--grpc_python_out=.',
+                '-I{}'.format(os.path.join(ROOT, 'src')),
+                '--python_out=src',
+                '--grpc_python_out=src',
                 proto,
             ])
 
@@ -102,8 +102,9 @@ setup(
 
     packages=['pygo_plugin', 'pygo_plugin._goplugin', 'pygo_plugin.proto'],
     package_dir={
-        'pygo_plugin._goplugin': 'pygo_plugin/_goplugin',
-        'pygo_plugin.proto': 'pygo_plugin/proto',
+        'pygo_plugin': 'src/pygo_plugin',
+        'pygo_plugin._goplugin': 'src/pygo_plugin/_goplugin',
+        'pygo_plugin.proto': 'src/pygo_plugin/proto',
     },
     package_data={
         'pygo_plugin._goplugin': ['*.so'],

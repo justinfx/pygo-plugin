@@ -2,7 +2,7 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-from tests.calc import plugin_pb2 as tests_dot_test__plugin_dot_plugin__pb2
+from calc import plugin_pb2 as calc_dot_plugin__pb2
 
 
 class CalcStub(object):
@@ -16,8 +16,8 @@ class CalcStub(object):
         """
         self.sum = channel.unary_unary(
                 '/testplugin.Calc/sum',
-                request_serializer=tests_dot_test__plugin_dot_plugin__pb2.SumRequest.SerializeToString,
-                response_deserializer=tests_dot_test__plugin_dot_plugin__pb2.SumResponse.FromString,
+                request_serializer=calc_dot_plugin__pb2.SumRequest.SerializeToString,
+                response_deserializer=calc_dot_plugin__pb2.SumResponse.FromString,
                 )
 
 
@@ -35,8 +35,8 @@ def add_CalcServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'sum': grpc.unary_unary_rpc_method_handler(
                     servicer.sum,
-                    request_deserializer=tests_dot_test__plugin_dot_plugin__pb2.SumRequest.FromString,
-                    response_serializer=tests_dot_test__plugin_dot_plugin__pb2.SumResponse.SerializeToString,
+                    request_deserializer=calc_dot_plugin__pb2.SumRequest.FromString,
+                    response_serializer=calc_dot_plugin__pb2.SumResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -60,7 +60,7 @@ class Calc(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/testplugin.Calc/sum',
-            tests_dot_test__plugin_dot_plugin__pb2.SumRequest.SerializeToString,
-            tests_dot_test__plugin_dot_plugin__pb2.SumResponse.FromString,
+            calc_dot_plugin__pb2.SumRequest.SerializeToString,
+            calc_dot_plugin__pb2.SumResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
