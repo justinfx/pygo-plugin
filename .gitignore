@@ -6,6 +6,8 @@ build/
 *.egg-info/
 .lock-waf*
 *.store
+*.egg
 
-pygo_plugin/_goplugin/*
-!pygo_plugin/_goplugin/__init__.py
+src/pygo_plugin/_goplugin/*
+!src/pygo_plugin/_goplugin/__init__.py
+!src/pygo_plugin/_goplugin/README.*

@@ -132,7 +132,11 @@ pip install -r requirements.txt
 python setup.py install
 
 # or... to hack on the source
-python setup.py develop  
+python setup.py develop 
+# and rebuild the bindings 
+python setup.py build_py  
+# run tests
+python -m pytest ./tests
 ```
 
 ## Usage

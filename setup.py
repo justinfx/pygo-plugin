@@ -1,14 +1,16 @@
 #!/usr/bin/env python
 
+import glob
+import os
+import pkg_resources
+import sys
+
+from setuptools import Command
 from distutils.command.build_py import build_py
 from distutils.core import setup
 from distutils.errors import DistutilsExecError
 from distutils.spawn import find_executable
-import glob
-import os
-import pkg_resources
-from setuptools import Command
-import sys
+from distutils import sysconfig
 
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -34,16 +36,27 @@ class GopyGenTool(Command):
         if not go:
             raise DistutilsExecError("could not find go executable in PATH")
 
+        srcdir = 'src/pygo_plugin/_goplugin'
+        output = os.path.join(ROOT, srcdir)
+
         self.spawn([
             gopy, self._CMD,
             '-name=goplugin',
             '-no-make=true',
             # '-symbols=false',  # slightly smaller binary if enabled
-            '-output', os.path.join(ROOT, 'pygo_plugin/_goplugin'),
+            '-output', output,
             '-vm', sys.executable,
             '-rename',
             os.path.join(ROOT, 'go_plugin'),
         ])
+
+        ext = sysconfig.get_config_var("EXT_SUFFIX")
+        if not ext:
+            ext = sysconfig.get_config_var("SO")
+        if not ext:
+            ext = ".so"
+        for src in glob.glob(os.path.join(srcdir, '*' + ext)):
+            self.copy_file(src, self.build_lib_target)
 
 
 class GopyBuildTool(GopyGenTool):
@@ -66,22 +79,29 @@ class GrpcGenTool(Command):
 
         proto_include = pkg_resources.resource_filename('grpc_tools', '_proto')
 
-        for proto in glob.glob(os.path.join(ROOT, 'pygo_plugin/proto/*.proto')):
+        for proto in glob.glob(os.path.join(ROOT, 'src/pygo_plugin/proto/*.proto')):
             grpc_tools.protoc.main([
                 'grpc_tools.protoc',
                 '-I{}'.format(proto_include),
-                '-I{}'.format(ROOT),
-                '--python_out=.',
-                '--grpc_python_out=.',
+                '-I{}'.format(os.path.join(ROOT, 'src')),
+                '--python_out=src',
+                '--grpc_python_out=src',
                 proto,
             ])
 
 
 class BuildPyCommand(build_py):
     def run(self):
+        target_dir = os.path.join(self.build_lib, 'pygo_plugin/_goplugin')
+        GopyGenTool.build_lib_target = target_dir
+
+        if not self.dry_run:
+            self.mkpath(target_dir)
+
         self.run_command('grpc')
         self.run_command('gopy_build')
-        super(BuildPyCommand, self).run()
+
+        build_py.run(self)
 
 
 setup(
@@ -102,11 +122,13 @@ setup(
 
     packages=['pygo_plugin', 'pygo_plugin._goplugin', 'pygo_plugin.proto'],
     package_dir={
-        'pygo_plugin._goplugin': 'pygo_plugin/_goplugin',
-        'pygo_plugin.proto': 'pygo_plugin/proto',
+        '': 'src',
+        'pygo_plugin': 'src/pygo_plugin',
+        'pygo_plugin._goplugin': 'src/pygo_plugin/_goplugin',
+        'pygo_plugin.proto': 'src/pygo_plugin/proto',
     },
     package_data={
-        'pygo_plugin._goplugin': ['*.so'],
+        'pygo_plugin._goplugin': ['*.so', '_*.so', '*.dylib', '_*.dylib'],
         'pygo_plugin.proto': ['*.py', '*.proto', '*.go-plugin'],
     },
     exclude_package_data={'pygo_plugin._goplugin': ['build.py']},
@@ -133,5 +155,6 @@ setup(
         'pybindgen',
         'typing; python_version == "2.7"',
     ],
+    extras_require={'': ['pytest']},
     zip_safe=False,
 )
