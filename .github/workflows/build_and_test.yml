@@ -42,4 +42,6 @@ jobs:
         run: python setup.py install
 
       - name: "Run Tests"
-        run: python setup.py develop && python -m pytest ./tests
+        run: |
+          tree
+          python -m pytest ./tests
