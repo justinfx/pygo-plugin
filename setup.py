@@ -102,7 +102,7 @@ setup(
 
     packages=['pygo_plugin', 'pygo_plugin._goplugin', 'pygo_plugin.proto'],
     package_dir={
-        'pygo_plugin': 'src/pygo_plugin',
+        '': 'src',
         'pygo_plugin._goplugin': 'src/pygo_plugin/_goplugin',
         'pygo_plugin.proto': 'src/pygo_plugin/proto',
     },
