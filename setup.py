@@ -133,5 +133,6 @@ setup(
         'pybindgen',
         'typing; python_version == "2.7"',
     ],
+    extras_require={'': ['pytest']},
     zip_safe=False,
 )
