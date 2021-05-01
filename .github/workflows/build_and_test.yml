@@ -40,6 +40,9 @@ jobs:
           pip install -r requirements.txt
           python setup.py install
 
+      - name: "Check install location"
+        run: tree /opt/hostedtoolcache/Python/3.8.9/x64/lib/python3.8/site-packages/pygo_plugin
+        
       - name: "Run Tests"
         run: |
           python setup.py develop
