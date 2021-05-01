@@ -35,13 +35,10 @@ jobs:
           go get golang.org/x/tools/cmd/goimports
           go get github.com/go-python/gopy@master
 
-      - name: "Install python dependencies"
-        run: pip install -r requirements.txt
-
       - name: "Install pygo-plugin"
-        run: python setup.py install
+        run: |
+          pip install -r requirements.txt
+          python setup.py install
 
       - name: "Run Tests"
-        run: |
-          tree
-          python -m pytest ./tests
+        run: python -m pytest ./tests
