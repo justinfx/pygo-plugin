@@ -143,7 +143,7 @@ python -m pytest ./tests
 
 To use the plugin system, you must take the following steps. These are
 high-level steps that must be done. Examples are available in the
-[pygo_plugin/_examples](pygo_plugin/_examples/) directory.
+[src/pygo_plugin/_examples](src/pygo_plugin/_examples/) directory.
 
   1. Write the gRPC Protocol Buffers interface that you want to expose for plugins.
 
