@@ -163,4 +163,114 @@ high-level steps that must be done. Examples are available in the
   5. Plugin users use `pygo_plugin.Client` to launch a subprocess and request
      an interface implementation over RPC.
 
+## `pyinterp`: a built-in Python-to-Python interpreter plugin
+
+`pygo_plugin.pyinterp` ships as a ready-to-use `Plugin` implementation: no
+proto file, no custom gRPC service, no plugin-side code to write. Point it
+at any Python interpreter and get back a live, transparent proxy into that
+interpreter from your host process.
+
+### What problem it solves
+
+A Python **host** process sometimes cannot simply `import` a library it
+needs, because:
+
+- the library only supports a different Python version than the host process is running,
+- the library's dependency graph conflicts with the host's own (pinned
+  versions, native extensions, etc.), or
+- the library only exists inside an isolated/managed environment (e.g. a
+  studio package-management system) that the host doesn't have direct
+  access to.
+
+`pyinterp` solves this by launching a second interpreter, any interpreter,
+any venv, as a `pygo-plugin` plugin subprocess, and handing back a live
+object proxy into it, so the host can call into that library as if it were
+local, without ever importing it directly.
+
+Running the library in its own subprocess also brings some operational
+benefits for free:
+
+- **Crash containment.** A fatal error in the library (a native extension
+  segfault, an interpreter-level crash) takes down only the plugin
+  subprocess, not the host.
+- **Full memory reclamation.** Large in-process caches or native
+  allocations that don't always give memory back to the OS, even after
+  Python's own garbage collector runs, are cleared for good the moment the
+  plugin subprocess is killed, the way unloading an in-process module
+  never really can.
+- **Live version swaps.** The interpreter/venv is chosen at connect time
+  (`pyinterp.connect(python=...)`), so pointing it at an updated venv and
+  restarting the plugin subprocess picks up a new version of the library
+  on the fly, without restarting the host process itself.
+
+### High-level architecture
+
+- **Control plane**: ordinary `pygo-plugin` machinery, unchanged, process
+  launch, handshake, health check, graceful shutdown. `pyinterp` is just
+  another `Plugin` implementation.
+- **Data plane**: rather than exposing a custom gRPC service, `pyinterp`
+  opens a second, [RPyC](https://github.com/tomerfiliba-org/rpyc)-based
+  side-channel connection directly between host and plugin subprocess (the
+  host chooses the endpoint and hands it to the subprocess via a single
+  environment variable). All object-proxy traffic (attribute access,
+  method calls, callbacks) goes over this channel, using RPyC's mature
+  `ClassicService` implementation rather than reinventing it.
+- This sidesteps needing `go-plugin`'s bidirectional `grpc_broker` (still
+  unimplemented in this project, see Roadmap) for the Python-to-Python
+  case: RPyC already provides bidirectional calls natively.
+- Scope: Python **host** talking to a Python **plugin subprocess**. RPyC's
+  wire protocol is Python-specific, so this does not extend to non-Python
+  plugin languages the way the rest of `pygo-plugin` does.
+
+### Usage
+
+```python
+from pygo_plugin import pyinterp
+
+with pyinterp.connect(python="/path/to/other/venv/bin/python") as (client, conn):
+    result = conn.modules['numpy'].array([1, 2, 3]).sum()
+```
+
+`pyinterp.connect()` handles the whole setup/teardown dance (launching the
+subprocess, handshake, RPyC connect, closing the connection and killing the
+subprocess on exit) in one call. `python` may be an absolute path, a bare
+executable name resolved via `PATH`, or omitted entirely to default to the
+current interpreter. See
+[src/pygo_plugin/_examples/pyinterp](src/pygo_plugin/_examples/pyinterp)
+for a runnable example.
+
+### What you get back: the `conn` object
+
+`conn` is a live [RPyC](https://rpyc.readthedocs.io/) classic `Connection`.
+Its full API is available; the parts most relevant to `pyinterp` are:
+
+- **`conn.modules['some.module']`** (or `conn.modules.some_module`)
+  imports and returns a proxy to a module inside the plugin subprocess, on
+  demand. Nothing on the host needs to import it, and no plugin-side code
+  needs to pre-register it, this is a generic remote import, not anything
+  specific to `pyinterp`'s own server code.
+- **Live proxies ("netrefs"), not copies.** Objects returned from remote
+  calls stay in the plugin subprocess. Attribute access and method calls
+  on them are dispatched back over the wire automatically, so a mutation
+  (e.g. `remote_list.append(4)`) really happens in the plugin subprocess,
+  and every subsequent access reflects it.
+- **Automatic reference counting.** Dropping the last local reference to a
+  proxy tells the plugin subprocess to release the corresponding object.
+  No manual handle management.
+- **Bidirectional calls, for free.** A host-side callable can be passed
+  into a remote call and be invoked *by* the plugin subprocess (e.g. as a
+  callback), with no extra setup. This project's own gRPC-based plugins
+  don't otherwise support this (see the `grpc_broker` item in the
+  Roadmap).
+- **`conn.eval("expr")` / `conn.execute("statements")`** run arbitrary
+  expressions or statements directly in the plugin subprocess's own
+  namespace (`conn.namespace`), for cases a normal proxied call doesn't
+  fit well. This is real code execution in the remote process, so treat a
+  `pyinterp` plugin as running in the same trust domain as the host (a
+  different venv/version, not a sandbox), not as an isolation boundary
+  against untrusted code.
+
+RPyC's exception-marshalling caveats, netref lifecycle edge cases, and the
+rest of its API are intentionally not duplicated here, see RPyC's own docs
+for the full picture.
 

@@ -29,6 +29,7 @@ dependencies = [
     "grpcio-health-checking",
     "grpcio-reflection",
     "protobuf",
+    "rpyc",
 ]
 
 [project.urls]
@@ -39,7 +40,7 @@ test = ["pytest"]
 
 [tool.setuptools]
 zip-safe = false
-packages = ["pygo_plugin", "pygo_plugin._goplugin", "pygo_plugin.proto"]
+packages = ["pygo_plugin", "pygo_plugin._goplugin", "pygo_plugin.proto", "pygo_plugin.pyinterp"]
 
 [tool.setuptools.package-dir]
 "" = "src"
