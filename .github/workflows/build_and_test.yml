@@ -30,12 +30,6 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
 
-      - name: "Install go dependencies"
-        run: |
-          go install golang.org/x/tools/cmd/goimports@latest
-          go install github.com/go-python/gopy@master
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-
       - name: "Install pygo-plugin"
         run: |
           sudo apt-get update && sudo apt-get install -y libpython3-dev

@@ -106,7 +106,7 @@ server implementation, but do not automatically gain these extended features.
 
 ## Requirements
 
-Building the pygo-plugin library requires a recent version of the [Go compiler](https://golang.org) (>= 1.21)
+Building the pygo-plugin library requires a recent version of the [Go compiler](https://golang.org) (>= 1.24)
 and Python >= 3.9.
 
 The python development headers are required to compile the python extension module. On linux:
@@ -115,16 +115,13 @@ The python development headers are required to compile the python extension modu
 sudo apt install libpython3-dev build-essential 
 ```
 
-The `gopy` and `goimports` tools must also be installed, to support generating the bindings from Go to Python:
+T`gopy` and `goimports` do not need to be installed or put on `PATH` by hand. They're declared as
+[Go 1.24 tool dependencies](https://go.dev/doc/modules/managing-dependencies#tools) in `go.mod`, pinned to exact
+versions alongside the rest of this project's Go dependencies, and the build script installs them on demand into
+a private, temporary location the first time they're needed.
 
-```
-go install golang.org/x/tools/cmd/goimports@latest
-go install github.com/go-python/gopy@master
-export PATH="$(go env GOPATH)/bin:$PATH"
-```
-
-After these tools are available, the build script will be able to generate bindings, and run the protobuf code
-generation.
+For a one-shot dev setup (creates a virtualenv, installs pygo-plugin editable, runs the tests), run
+`./scripts/bootstrap.sh`. Otherwise, the same steps by hand:
 
 ```
 # Create and activate a virtualenv
