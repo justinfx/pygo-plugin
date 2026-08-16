@@ -2,14 +2,13 @@ from __future__ import absolute_import
 
 import abc
 
-import future.utils as futils
 import grpc
 
 
 __all__ = ['Plugin']
 
 
-class Plugin(futils.with_metaclass(abc.ABCMeta, object)):
+class Plugin(abc.ABC):
     """
     Plugin is an abstract class providing an interface
     for both the client (host) and server (plugin) sides

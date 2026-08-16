@@ -2,15 +2,14 @@
 
 import glob
 import os
-import pkg_resources
+import shutil
 import sys
+import sysconfig
+from importlib import resources
 
-from setuptools import Command
-from distutils.command.build_py import build_py
-from distutils.core import setup
-from distutils.errors import DistutilsExecError
-from distutils.spawn import find_executable
-from distutils import sysconfig
+from setuptools import Command, setup
+from setuptools.command.build_py import build_py
+from setuptools.errors import ExecError
 
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -21,6 +20,7 @@ class GopyGenTool(Command):
     user_options = []
 
     _CMD = 'gen'
+    build_lib_target = None
 
     def initialize_options(self):
         pass
@@ -29,12 +29,12 @@ class GopyGenTool(Command):
         pass
 
     def run(self):
-        gopy = find_executable('gopy')
+        gopy = shutil.which('gopy')
         if not gopy:
-            raise DistutilsExecError("could not find gopy executable in PATH")
-        go = find_executable('go')
+            raise ExecError("could not find gopy executable in PATH")
+        go = shutil.which('go')
         if not go:
-            raise DistutilsExecError("could not find go executable in PATH")
+            raise ExecError("could not find go executable in PATH")
 
         srcdir = 'src/pygo_plugin/_goplugin'
         output = os.path.join(ROOT, srcdir)
@@ -49,6 +49,11 @@ class GopyGenTool(Command):
             '-rename',
             os.path.join(ROOT, 'go_plugin'),
         ])
+
+        if self.build_lib_target is None:
+            # Running standalone (not as part of build_py): gopy already
+            # wrote the extension directly into `output`, nothing to copy.
+            return
 
         ext = sysconfig.get_config_var("EXT_SUFFIX")
         if not ext:
@@ -77,7 +82,7 @@ class GrpcGenTool(Command):
     def run(self):
         import grpc_tools.protoc
 
-        proto_include = pkg_resources.resource_filename('grpc_tools', '_proto')
+        proto_include = str(resources.files('grpc_tools') / '_proto')
 
         for proto in glob.glob(os.path.join(ROOT, 'src/pygo_plugin/proto/*.proto')):
             grpc_tools.protoc.main([
@@ -115,7 +120,7 @@ setup(
     name='pygo-plugin',
     version='0.0.1',
     url='https://github.com/justinfx/pygo-plugin',
-    license='Apache License 2.0',
+    license='Apache-2.0',
     author='Justin Israel',
     author_email='justinisrael@gmail.com',
     description='Python gRPC Plugin System (port of hashicorp/go-plugin)',
@@ -133,28 +138,25 @@ setup(
     },
     exclude_package_data={'pygo_plugin._goplugin': ['build.py']},
 
+    python_requires='>=3.9',
     classifiers=[
         'Development Status :: 4 - Alpha',
         # 'Development Status :: 5 - Production/Stable',
-        'License :: OSI Approved :: Apache Software Licensee',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
     ],
     keywords=['python', 'rpc', 'plugin', 'grpc', 'grpcio', 'go-plugin', 'hashicorp'],
     install_requires=[
-        'future',
-        'futures; python_version == "2.7"',
+        'grpcio',
         'grpcio-tools',
         'grpcio-health-checking',
         'grpcio-reflection',
-        'protobuf==3.*',
+        'protobuf',
         'pybindgen',
-        'typing; python_version == "2.7"',
     ],
-    extras_require={'': ['pytest']},
+    extras_require={'test': ['pytest']},
     zip_safe=False,
 )

@@ -1,8 +1,25 @@
 module github.com/justinfx/pygo-plugin
 
-go 1.16
+go 1.24
 
 require (
-	github.com/go-python/gopy v0.3.5-0.20210326081611-ac5c077a97b3
-	github.com/hashicorp/go-plugin v1.4.0
+	github.com/go-python/gopy v0.4.11-0.20260730003934-d39a31b25439
+	github.com/hashicorp/go-plugin v1.8.0
+)
+
+require (
+	github.com/fatih/color v1.13.0 // indirect
+	github.com/golang/protobuf v1.5.4 // indirect
+	github.com/hashicorp/go-hclog v1.6.3 // indirect
+	github.com/hashicorp/yamux v0.1.2 // indirect
+	github.com/mattn/go-colorable v0.1.12 // indirect
+	github.com/mattn/go-isatty v0.0.17 // indirect
+	github.com/oklog/run v1.1.0 // indirect
+	github.com/stretchr/testify v1.9.0 // indirect
+	golang.org/x/net v0.38.0 // indirect
+	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20231106174013-bbf56f31fb17 // indirect
+	google.golang.org/grpc v1.61.0 // indirect
+	google.golang.org/protobuf v1.36.6 // indirect
 )
