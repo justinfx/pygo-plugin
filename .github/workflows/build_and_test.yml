@@ -39,8 +39,7 @@ jobs:
       - name: "Install pygo-plugin"
         run: |
           sudo apt-get update && sudo apt-get install -y libpython3-dev
-          pip install -r requirements.txt
-          python setup.py install
+          pip install ".[test]"
 
       - name: "Run Tests"
         run: python -m pytest ./tests

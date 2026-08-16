@@ -1,0 +1,52 @@
+[build-system]
+# grpcio-tools/pybindgen are build-time-only (used by the custom grpc/
+# gopy_gen/gopy_build commands in setup.py to generate code, not runtime,
+# so they belong here rather than in [project.dependencies].
+requires = ["setuptools>=64", "wheel", "grpcio-tools", "pybindgen"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pygo-plugin"
+version = "0.0.1"
+description = "Python gRPC Plugin System (port of hashicorp/go-plugin)"
+readme = "README.md"
+license = "Apache-2.0"
+authors = [{name = "Justin Israel", email = "justinisrael@gmail.com"}]
+requires-python = ">=3.9"
+keywords = ["python", "rpc", "plugin", "grpc", "grpcio", "go-plugin", "hashicorp"]
+classifiers = [
+    "Development Status :: 4 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+# Runtime-only - see setup.py's GrpcGenTool/GopyGenTool for the separate
+# build-time tools (grpcio-tools, pybindgen), declared above instead.
+dependencies = [
+    "grpcio",
+    "grpcio-health-checking",
+    "grpcio-reflection",
+    "protobuf",
+]
+
+[project.urls]
+Homepage = "https://github.com/justinfx/pygo-plugin"
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.setuptools]
+zip-safe = false
+packages = ["pygo_plugin", "pygo_plugin._goplugin", "pygo_plugin.proto"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools.package-data]
+"pygo_plugin._goplugin" = ["*.so", "_*.so", "*.dylib", "_*.dylib"]
+"pygo_plugin.proto" = ["*.py", "*.proto", "*.go-plugin"]
+
+[tool.setuptools.exclude-package-data]
+"pygo_plugin._goplugin" = ["build.py"]

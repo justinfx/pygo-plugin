@@ -131,14 +131,11 @@ generation.
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Install python dependencies.
-pip install -r requirements.txt
+# Install pygo-plugin (builds proto codegen + the Go->Python extension automatically)
+pip install .
 
-# Install pygo
-python setup.py install
-
-# or... to hack on the source
-pip install -e . --no-build-isolation
+# or... to hack on the source, with pytest included
+pip install -e ".[test]" --no-build-isolation
 # and rebuild the bindings after changing go_plugin/*.go or *.proto files
 python setup.py build_py  
 # run tests

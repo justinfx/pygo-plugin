@@ -109,6 +109,11 @@ class BuildPyCommand(build_py):
         build_py.run(self)
 
 
+# All static metadata (name, version, dependencies, classifiers, packages,
+# package_data, etc.) lives in pyproject.toml now. setup.py's only reason
+# to exist is these custom Commands (gopy/protoc invoke external tools and
+# can't be expressed declaratively), so cmdclass is the only thing left
+# here.
 setup(
     cmdclass={
         'build_py': BuildPyCommand,
@@ -116,47 +121,4 @@ setup(
         'gopy_gen': GopyGenTool,
         'gopy_build': GopyBuildTool,
     },
-
-    name='pygo-plugin',
-    version='0.0.1',
-    url='https://github.com/justinfx/pygo-plugin',
-    license='Apache-2.0',
-    author='Justin Israel',
-    author_email='justinisrael@gmail.com',
-    description='Python gRPC Plugin System (port of hashicorp/go-plugin)',
-
-    packages=['pygo_plugin', 'pygo_plugin._goplugin', 'pygo_plugin.proto'],
-    package_dir={
-        '': 'src',
-        'pygo_plugin': 'src/pygo_plugin',
-        'pygo_plugin._goplugin': 'src/pygo_plugin/_goplugin',
-        'pygo_plugin.proto': 'src/pygo_plugin/proto',
-    },
-    package_data={
-        'pygo_plugin._goplugin': ['*.so', '_*.so', '*.dylib', '_*.dylib'],
-        'pygo_plugin.proto': ['*.py', '*.proto', '*.go-plugin'],
-    },
-    exclude_package_data={'pygo_plugin._goplugin': ['build.py']},
-
-    python_requires='>=3.9',
-    classifiers=[
-        'Development Status :: 4 - Alpha',
-        # 'Development Status :: 5 - Production/Stable',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.9',
-        'Programming Language :: Python :: 3.10',
-        'Programming Language :: Python :: 3.11',
-        'Programming Language :: Python :: 3.12',
-    ],
-    keywords=['python', 'rpc', 'plugin', 'grpc', 'grpcio', 'go-plugin', 'hashicorp'],
-    install_requires=[
-        'grpcio',
-        'grpcio-tools',
-        'grpcio-health-checking',
-        'grpcio-reflection',
-        'protobuf',
-        'pybindgen',
-    ],
-    extras_require={'test': ['pytest']},
-    zip_safe=False,
 )
