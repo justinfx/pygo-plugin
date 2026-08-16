@@ -216,8 +216,7 @@ def connect(python=None, env=None, args=None, dir=None):
 
     cmd = pygo_plugin.Cmd([interp, '-m', 'pygo_plugin.pyinterp'] + list(args or []))
     if env is not None:
-        for key, value in env.items():
-            cmd.env.append('%s=%s' % (key, value))
+        cmd.env += pygo_plugin.utils.env_to_list(env)
     if dir is not None:
         cmd.dir = dir
     # prepare_cmd() appends its own endpoint var to cmd.env, so it must

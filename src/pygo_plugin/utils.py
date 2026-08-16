@@ -28,3 +28,17 @@ def find_free_port(min_port=1024, max_port=_MAX_PORT):
         except OSError:
             port += 1
     raise IOError("no free port in range {}-{}".format(min_port, max_port))
+
+
+def env_to_list(env):
+    """
+    Convert an os.environ-style dict into the "KEY=VALUE" list format
+    expected by pygo_plugin.Cmd.env.
+
+    Args:
+        env (dict[str, str]): environment variables
+
+    Returns:
+        list[str]: ["KEY=VALUE", ...]
+    """
+    return ['{}={}'.format(k, v) for k, v in env.items()]
