@@ -3,10 +3,10 @@ from __future__ import absolute_import
 import typing
 
 from ._goplugin import go_plugin as _wrapper
-from ._goplugin.go_plugin import HandshakeConfig
+from ._goplugin.go_plugin import HandshakeConfig as _GoHandshakeConfig
 from . import plugin
 
-__all__ = ['Client', 'ClientConfig', 'Cmd', 'HandshakeConfig']
+__all__ = ['Client', 'ClientConfig', 'Cmd']
 
 
 # noinspection PyPep8Naming
@@ -63,6 +63,26 @@ class ClientConfig(_wrapper.ClientConfig):
     def plugins(self):
         # type: () -> typing.Dict[str, plugin.Plugin]
         return self._plugin_set
+
+    @property
+    def handshake_config(self):
+        return _wrapper.ClientConfig.handshake_config.fget(self)
+
+    @handshake_config.setter
+    def handshake_config(self, value):
+        # Accept the plain pygo_plugin.HandshakeConfig (plugin.HandshakeConfig)
+        # and convert it to the Go-bound type the underlying gopy property
+        # requires. This is the one place that conversion needs to happen,
+        # so plugin authors (and pygo_plugin.pyinterp) can build a
+        # HandshakeConfig without ever importing this module. See
+        # plugin.HandshakeConfig's docstring.
+        if isinstance(value, plugin.HandshakeConfig):
+            converted = _GoHandshakeConfig()
+            converted.protocol_version = value.protocol_version
+            converted.magic_cookie_key = value.magic_cookie_key
+            converted.magic_cookie_value = value.magic_cookie_value
+            value = converted
+        _wrapper.ClientConfig.handshake_config.fset(self, value)
 
     def set_cmd(self, cmd, *args, **kwargs):
         """

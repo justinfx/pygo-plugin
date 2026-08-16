@@ -5,7 +5,28 @@ import abc
 import grpc
 
 
-__all__ = ['Plugin']
+__all__ = ['Plugin', 'HandshakeConfig']
+
+
+class HandshakeConfig(object):
+    """
+    Plain, dependency-free stand-in for the Go-bound ``plugin.HandshakeConfig``
+    struct, so a plugin subprocess can build one without pulling in the
+    compiled gopy extension. ``client.ClientConfig.handshake_config``'s
+    setter converts it to the real Go-bound type on the host side.
+    """
+    __slots__ = ('protocol_version', 'magic_cookie_key', 'magic_cookie_value')
+
+    def __init__(self, protocol_version=0, magic_cookie_key='', magic_cookie_value=''):
+        self.protocol_version = protocol_version
+        self.magic_cookie_key = magic_cookie_key
+        self.magic_cookie_value = magic_cookie_value
+
+    def __repr__(self):
+        return (
+            'HandshakeConfig(protocol_version=%r, magic_cookie_key=%r, '
+            'magic_cookie_value=%r)' % (
+                self.protocol_version, self.magic_cookie_key, self.magic_cookie_value))
 
 
 class Plugin(abc.ABC):

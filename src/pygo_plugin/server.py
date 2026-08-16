@@ -14,10 +14,14 @@ from grpc_health.v1.health import HealthServicer
 from grpc_health.v1 import health_pb2, health_pb2_grpc
 from grpc_reflection.v1alpha import reflection
 
-import pygo_plugin
-import pygo_plugin.proto.grpc_controller_pb2 as _controller_pb2
-import pygo_plugin.proto.grpc_controller_pb2_grpc as _controller_pb2_grpc
-import pygo_plugin.utils
+# Deliberately import specific submodules rather than the pygo_plugin
+# package itself (or pygo_plugin.client). This module is used by a plugin
+# subprocess (see pygo_plugin.pyinterp), which must not need the compiled
+# gopy extension pygo_plugin.client depends on.
+from . import plugin as _plugin
+from . import utils
+from .proto import grpc_controller_pb2 as _controller_pb2
+from .proto import grpc_controller_pb2_grpc as _controller_pb2_grpc
 
 
 __all__ = ['serve', 'Server', 'ServeConfig']
@@ -39,7 +43,7 @@ def serve(cfg):
     Args:
         cfg (ServeConfig):
     """
-    server = pygo_plugin.Server(cfg)
+    server = Server(cfg)
     if not server.serve(wait=True):
         if server.error_msg:
             logging.error(server.error_msg)
@@ -66,12 +70,12 @@ class ServeConfig(object):
             pygo_plugin.HandshakeConfig
         """
         if self._handshake is None:
-            self._handshake = pygo_plugin.HandshakeConfig()
+            self._handshake = _plugin.HandshakeConfig()
         return self._handshake
 
     @handshake_config.setter
     def handshake_config(self, cfg):
-        if cfg is not None and not isinstance(cfg, pygo_plugin.HandshakeConfig):
+        if cfg is not None and not isinstance(cfg, _plugin.HandshakeConfig):
             raise TypeError("type %r is not a HandshakeConfig" % type(cfg))
         self._handshake = cfg
 
@@ -208,7 +212,7 @@ class Server(object):
             except ValueError:
                 pass
             if port_opts:
-                port = pygo_plugin.utils.find_free_port(**port_opts)
+                port = utils.find_free_port(**port_opts)
             port = server.add_insecure_port('127.0.0.1:{}'.format(port))
             network = 'tcp'
             endpoint = '127.0.0.1:%d' % port
