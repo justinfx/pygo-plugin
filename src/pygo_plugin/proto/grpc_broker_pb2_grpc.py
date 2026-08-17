@@ -5,7 +5,7 @@ import warnings
 
 from pygo_plugin.proto import grpc_broker_pb2 as pygo__plugin_dot_proto_dot_grpc__broker__pb2
 
-GRPC_GENERATED_VERSION = '1.83.0'
+GRPC_GENERATED_VERSION = '1.80.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -25,7 +25,7 @@ if _version_not_supported:
     )
 
 
-class GRPCBrokerStub:
+class GRPCBrokerStub(object):
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
@@ -41,7 +41,7 @@ class GRPCBrokerStub:
                 _registered_method=True)
 
 
-class GRPCBrokerServicer:
+class GRPCBrokerServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def StartStream(self, request_iterator, context):
@@ -66,7 +66,7 @@ def add_GRPCBrokerServicer_to_server(servicer, server):
 
 
  # This class is part of an EXPERIMENTAL API.
-class GRPCBroker:
+class GRPCBroker(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod

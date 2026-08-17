@@ -5,7 +5,7 @@ import warnings
 
 from pygo_plugin.proto import grpc_controller_pb2 as pygo__plugin_dot_proto_dot_grpc__controller__pb2
 
-GRPC_GENERATED_VERSION = '1.83.0'
+GRPC_GENERATED_VERSION = '1.80.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -25,7 +25,7 @@ if _version_not_supported:
     )
 
 
-class GRPCControllerStub:
+class GRPCControllerStub(object):
     """The GRPCController is responsible for telling the plugin server to shutdown.
     """
 
@@ -42,7 +42,7 @@ class GRPCControllerStub:
                 _registered_method=True)
 
 
-class GRPCControllerServicer:
+class GRPCControllerServicer(object):
     """The GRPCController is responsible for telling the plugin server to shutdown.
     """
 
@@ -68,7 +68,7 @@ def add_GRPCControllerServicer_to_server(servicer, server):
 
 
  # This class is part of an EXPERIMENTAL API.
-class GRPCController:
+class GRPCController(object):
     """The GRPCController is responsible for telling the plugin server to shutdown.
     """
 

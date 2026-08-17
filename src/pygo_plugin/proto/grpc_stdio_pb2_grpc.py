@@ -6,7 +6,7 @@ import warnings
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 from pygo_plugin.proto import grpc_stdio_pb2 as pygo__plugin_dot_proto_dot_grpc__stdio__pb2
 
-GRPC_GENERATED_VERSION = '1.83.0'
+GRPC_GENERATED_VERSION = '1.80.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -26,7 +26,7 @@ if _version_not_supported:
     )
 
 
-class GRPCStdioStub:
+class GRPCStdioStub(object):
     """GRPCStdio is a service that is automatically run by the plugin process
     to stream any stdout/err data so that it can be mirrored on the plugin
     host side.
@@ -45,7 +45,7 @@ class GRPCStdioStub:
                 _registered_method=True)
 
 
-class GRPCStdioServicer:
+class GRPCStdioServicer(object):
     """GRPCStdio is a service that is automatically run by the plugin process
     to stream any stdout/err data so that it can be mirrored on the plugin
     host side.
@@ -78,7 +78,7 @@ def add_GRPCStdioServicer_to_server(servicer, server):
 
 
  # This class is part of an EXPERIMENTAL API.
-class GRPCStdio:
+class GRPCStdio(object):
     """GRPCStdio is a service that is automatically run by the plugin process
     to stream any stdout/err data so that it can be mirrored on the plugin
     host side.
