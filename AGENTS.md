@@ -35,8 +35,7 @@ The repo has two halves:
    rather than a shared/global error, since multiple `Client`s are launched concurrently from separate Python
    threads in practice (see `tests/pyinterp/test_pyinterp_concurrency.py`).
    Because this is a plain shared library that never touches the CPython C API, one compiled artifact works
-   unmodified across Python versions; there's no per-Python-minor-version build matrix to maintain for it (see
-   `PLAN.md` §12 for the investigation that led here).
+   unmodified across Python versions; there's no per-Python-minor-version build matrix to maintain for it.
    - `pygo_plugin/_native.py` loads the compiled library via `cffi` (`ffi.dlopen(...)`, no compile step on the
      Python side) and exposes thin wrapper functions doing the string/array marshalling and error-to-exception
      conversion.
@@ -140,11 +139,10 @@ those names; a plugin subprocess (e.g. `pygo_plugin.pyinterp`'s `__main__` entry
 `tests/calc/calc_plugin.py` run standalone) only needs `pygo_plugin.plugin`/`.server`, and must not be forced to
 have the compiled library present just because it did `import pygo_plugin`. A module-level `__getattr__`
 (PEP 562) in `__init__.py` defers importing `.client` until `Client`/`ClientConfig`/`Cmd`/`ReattachConfig` is
-actually accessed, caching the result on first access; see `PLAN.md` section 6.1 for the fix's original history
-(from back when the constraint being worked around was "the compiled extension is built for one specific
-CPython ABI"; see section 12 for how the cffi/c-shared migration eliminated that constraint at the root instead
-of just working around it: a plugin-only environment still doesn't need the native library at all, but now
-*any* Python version's host can use the one compiled library, not just the one it was built against).
+actually accessed, caching the result on first access. This originally worked around "the compiled extension is
+built for one specific CPython ABI"; the later cffi/c-shared migration eliminated that constraint at the root
+instead of just working around it: a plugin-only environment still doesn't need the native library at all, but
+now *any* Python version's host can use the one compiled library, not just the one it was built against.
 `pygo_plugin.HandshakeConfig` (defined in `plugin.py`) is no longer a "related but separate fix" needing its own
 conversion path; with no Go-bound Python type left at all, it's simply the one and only representation, used
 as-is on both the host and plugin side.
