@@ -11,18 +11,18 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: ['3.11', '3.12']
+        python-version: ['3.9', '3.12']
         go-version: ['1.24.x']
     name: 'Build ${{ matrix.os }} <py=${{ matrix.python-version }}, go=${{ matrix.go-version }}>'
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go-version }}
 
