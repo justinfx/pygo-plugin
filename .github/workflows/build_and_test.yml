@@ -1,13 +1,9 @@
 name: Build and test
 
-# Run the jobs for pushes and pull requests targeting main branch.
-on: 
+# Run the jobs for pushes and pull requests on all branches.
+on:
   push:
-    branches:
-      - main
   pull_request:
-    branches:
-      - main
 
 jobs:
   # Job which sets up the dependencies and builds the project.
