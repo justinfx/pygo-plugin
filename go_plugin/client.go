@@ -1,278 +1,297 @@
-package go_plugin
+// Command go_plugin builds as a C shared library (-buildmode=c-shared)
+// exposing a small C ABI over hashicorp/go-plugin's Client, consumed from
+// Python via cffi (see src/pygo_plugin/_native.py). The compiled library
+// never touches the CPython C API, so it is not tied to any particular
+// Python version or ABI.
+//
+// Only *plugin.Client needs to survive across separate calls (kill/exited/
+// ping/start all operate on the same running client), so it is the only
+// value kept alive across the cgo boundary, via runtime/cgo.Handle, the
+// standard library's mechanism (Go 1.17+) for passing opaque references to
+// Go values through C without violating cgo's pointer-passing rules. Cmd,
+// ClientConfig and ReattachConfig never need to persist inside Go between
+// calls: Python builds them up entirely on its own side and hands the
+// whole thing to NewClient in one call.
+package main
+
+// #include <stdlib.h>
+// #include <stdint.h>
+import "C"
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"net"
 	"os/exec"
+	"runtime/cgo"
 	"time"
+	"unsafe"
 
 	plugin "github.com/hashicorp/go-plugin"
-
-	// keep dependency in go.mod
-	_ "github.com/go-python/gopy/gopyh"
 )
 
-// generate interfaces into classes in python
+func main() {}
 
-type NetAddr net.Addr
-
-// type aliases to expose directly to python
-
-type HandshakeConfig = plugin.HandshakeConfig
-
-type Cmd struct {
-	Path string
-	Args []string
-	Env  []string
-	Dir  string
+// simpleAddr is a minimal net.Addr for reconstructing a ReattachConfig's
+// Addr from the network/address strings Python provides. go-plugin only
+// ever calls Network()/String() on it (to pick unix vs tcp dialing and get
+// the address to dial), so a full net.UnixAddr/net.TCPAddr isn't needed,
+// which also avoids the syscalls/errors net.Resolve*Addr could introduce.
+type simpleAddr struct {
+	network string
+	address string
 }
 
-func NewCmd() *Cmd {
-	return &Cmd{
-		Args: []string{},
-		Env:  []string{},
+func (a simpleAddr) Network() string { return a.network }
+func (a simpleAddr) String() string  { return a.address }
+
+// string/error marshalling helpers
+
+func goString(s *C.char) string {
+	if s == nil {
+		return ""
+	}
+	return C.GoString(s)
+}
+
+func setOutError(out **C.char, err error) {
+	if out != nil && err != nil {
+		*out = C.CString(err.Error())
 	}
 }
 
-func (c *Cmd) Valid() bool {
-	return c.Path != ""
-}
-
-type ReattachConfig struct {
-	*plugin.ReattachConfig
-}
-
-func (c *ReattachConfig) SetPtr(ptr *plugin.ReattachConfig) {
-	c.ReattachConfig = ptr
-}
-
-func (c *ReattachConfig) String() string {
-	if !c.Valid() {
-		return "<ReattachConfig: Valid=False>"
+func setOutString(out **C.char, s string) {
+	if out != nil {
+		*out = C.CString(s)
 	}
-	return fmt.Sprintf("<ReattachConfig: Protocol=%v, Addr=%v, Pid=%v>",
-		c.Protocol(), c.Addr(), c.Pid())
 }
 
-// gopy:name protocol
-func (c *ReattachConfig) Protocol() plugin.Protocol {
-	if !c.Valid() {
-		return plugin.ProtocolInvalid
+//export FreeString
+func FreeString(s *C.char) {
+	C.free(unsafe.Pointer(s))
+}
+
+// Client handle lookup
+
+// clientFromHandle safely resolves a Client handle, recovering from the
+// panic cgo.Handle.Value() raises for an invalid/deleted handle. A panic
+// escaping an //export'ed function is fatal to the whole process rather
+// than a catchable Python exception, so every handle lookup below goes
+// through this instead of calling cgo.Handle.Value() directly.
+func clientFromHandle(h C.uintptr_t) (c *plugin.Client, ok bool) {
+	defer func() {
+		if recover() != nil {
+			c, ok = nil, false
+		}
+	}()
+	v := cgo.Handle(h).Value()
+	c, ok = v.(*plugin.Client)
+	return
+}
+
+const invalidHandleErr = "invalid or already-freed Client handle"
+
+// NewClient / FreeClient
+
+// handshakeParams, cmdParams and reattachParams mirror plugin.HandshakeConfig,
+// exec.Cmd and plugin.ReattachConfig closely enough to decode directly off
+// the wire; newClientRequest is the single JSON document NewClient accepts.
+// Using one JSON blob instead of ~20 flat positional C parameters removes
+// an entire class of bug (a same-typed parameter landing in the wrong
+// position silently corrupts the wrong field) in exchange for a decode
+// step that only ever runs once per Client, not per call.
+type handshakeParams struct {
+	ProtocolVersion  uint   `json:"protocol_version"`
+	MagicCookieKey   string `json:"magic_cookie_key"`
+	MagicCookieValue string `json:"magic_cookie_value"`
+}
+
+type cmdParams struct {
+	Path string   `json:"path"`
+	Args []string `json:"args"`
+	Env  []string `json:"env"`
+	Dir  string   `json:"dir"`
+}
+
+type reattachParams struct {
+	Protocol string `json:"protocol"`
+	Network  string `json:"network"`
+	Address  string `json:"address"`
+	Pid      int    `json:"pid"`
+	Test     bool   `json:"test"`
+}
+
+type newClientRequest struct {
+	Handshake        handshakeParams `json:"handshake"`
+	Cmd              *cmdParams      `json:"cmd"`
+	Reattach         *reattachParams `json:"reattach"`
+	MinPort          uint            `json:"min_port"`
+	MaxPort          uint            `json:"max_port"`
+	StartTimeoutMsec int64           `json:"start_timeout_msec"`
+	AutoMTLS         bool            `json:"auto_mtls"`
+}
+
+// NewClient returns 0 (an invalid cgo.Handle, per its own documented
+// invariant) with outError set if configJSON fails to parse; Python checks
+// for a 0 return the same way it checks any other outError-reporting call.
+//
+//export NewClient
+func NewClient(configJSON *C.char, outError **C.char) C.uintptr_t {
+	var req newClientRequest
+	if err := json.Unmarshal([]byte(goString(configJSON)), &req); err != nil {
+		setOutError(outError, fmt.Errorf("invalid NewClient config: %w", err))
+		return 0
 	}
-	return c.ReattachConfig.Protocol
-}
 
-// gopy:name addr
-func (c *ReattachConfig) Addr() net.Addr {
-	if !c.Valid() {
-		return nil
+	cfg := &plugin.ClientConfig{
+		HandshakeConfig: plugin.HandshakeConfig{
+			ProtocolVersion:  req.Handshake.ProtocolVersion,
+			MagicCookieKey:   req.Handshake.MagicCookieKey,
+			MagicCookieValue: req.Handshake.MagicCookieValue,
+		},
+		Plugins:          map[string]plugin.Plugin{},
+		MinPort:          req.MinPort,
+		MaxPort:          req.MaxPort,
+		StartTimeout:     time.Duration(req.StartTimeoutMsec) * time.Millisecond,
+		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
+		AutoMTLS:         req.AutoMTLS,
 	}
-	return c.ReattachConfig.Addr
-}
 
-// gopy:name pid
-func (c *ReattachConfig) Pid() int {
-	if !c.Valid() {
-		return -1
+	if req.Cmd != nil && req.Cmd.Path != "" {
+		cfg.Cmd = &exec.Cmd{
+			Path: req.Cmd.Path,
+			Args: req.Cmd.Args,
+			Env:  req.Cmd.Env,
+			Dir:  req.Cmd.Dir,
+		}
+	} else if req.Reattach != nil {
+		protocol := req.Reattach.Protocol
+		if protocol == "" {
+			protocol = string(plugin.ProtocolGRPC)
+		}
+		cfg.Reattach = &plugin.ReattachConfig{
+			Protocol: plugin.Protocol(protocol),
+			Addr: simpleAddr{
+				network: req.Reattach.Network,
+				address: req.Reattach.Address,
+			},
+			Pid:  req.Reattach.Pid,
+			Test: req.Reattach.Test,
+		}
 	}
-	return c.ReattachConfig.Pid
+
+	client := plugin.NewClient(cfg)
+	return C.uintptr_t(cgo.NewHandle(client))
 }
 
-// gopy:name test
-func (c *ReattachConfig) Test() bool {
-	if !c.Valid() {
-		return false
+//export FreeClient
+func FreeClient(handle C.uintptr_t) {
+	// Deleting an already-deleted (or never-valid) Handle panics; recover
+	// so a double-free from Python (e.g. a defensive __del__) is a no-op,
+	// not a process crash.
+	defer func() { recover() }()
+	cgo.Handle(handle).Delete()
+}
+
+// Client methods
+
+//export ClientExited
+func ClientExited(handle C.uintptr_t) C.int {
+	c, ok := clientFromHandle(handle)
+	if !ok {
+		return 1
 	}
-	return c.ReattachConfig.Test
+	if c.Exited() {
+		return 1
+	}
+	return 0
 }
 
-// gopy:name set_test
-func (c *ReattachConfig) SetTest(enabled bool) {
-	if !c.Valid() {
+//export ClientKill
+func ClientKill(handle C.uintptr_t) {
+	c, ok := clientFromHandle(handle)
+	if !ok {
 		return
 	}
-	c.ReattachConfig.Test = enabled
+	c.Kill()
 }
 
-// gopy:name valid
-func (c *ReattachConfig) Valid() bool {
-	return c != nil && c.ReattachConfig != nil && c.ReattachConfig.Protocol != plugin.ProtocolInvalid
-}
-
-type ClientConfig struct {
-	// HandshakeConfig is the configuration that must match servers.
-	HandshakeConfig plugin.HandshakeConfig
-
-	//// Plugins are the plugins that can be consumed.
-	//// The implied version of this PluginSet is the Handshake.ProtocolVersion.
-	//Plugins plugin.PluginSet
-
-	//// VersionedPlugins is a map of PluginSets for specific protocol versions.
-	//// These can be used to negotiate a compatible version between client and
-	//// server. If this is set, Handshake.ProtocolVersion is not required.
-	//VersionedPlugins map[int]plugin.PluginSet
-
-	// One of the following must be set, but not both.
-	//
-	// Cmd is the unstarted subprocess for starting the plugin. If this is
-	// set, then the Client starts the plugin process on its own and connects
-	// to it.
-	//
-	// Reattach is configuration for reattaching to an existing plugin process
-	// that is already running. This isn't common.
-	cmd      *Cmd
-	reattach *plugin.ReattachConfig
-
-	//// SecureConfig is configuration for verifying the integrity of the
-	//// executable. It can not be used with Reattach.
-	//SecureConfig *plugin.SecureConfig
-
-	//// TLSConfig is used to enable TLS on the RPC client.
-	//TLSConfig *tls.Config
-
-	// The minimum port to use for communicating with the subprocess.
-	// If not set, this defaults to 10,000.
-	MinPort uint
-
-	// The maximum port to use for communicating with the subprocess.
-	// If not set, this defaults to 25,000.
-	MaxPort uint
-
-	// startTimeout is the timeout to wait for the plugin to say it
-	// has started successfully.
-	startTimeout time.Duration
-
-	// If non-nil, then the stderr of the client will be written to here
-	// (as well as the log). This is the original os.Stderr of the subprocess.
-	// This isn't the output of synced stderr.
-	Stderr io.Writer
-
-	// SyncStdout, SyncStderr can be set to override the
-	// respective os.Std* values in the plugin. Care should be taken to
-	// avoid races here. If these are nil, then this will be set to
-	// ioutil.Discard.
-	SyncStdout io.Writer
-	SyncStderr io.Writer
-
-	//// AllowedProtocols is a list of allowed protocols. If this isn't set,
-	//// then only netrpc is allowed. This is so that older go-plugin systems
-	//// can show friendly errors if they see a plugin with an unknown
-	//// protocol.
-	////
-	//// By setting this, you can cause an error immediately on plugin start
-	//// if an unsupported protocol is used with a good error message.
-	////
-	//// If this isn't set at all (nil value), then only net/rpc is accepted.
-	//// This is done for legacy reasons. You must explicitly opt-in to
-	//// new protocols.
-	//AllowedProtocols []plugin.Protocol
-
-	// AutoMTLS has the client and server automatically negotiate mTLS for
-	// transport authentication. This ensures that only the original client will
-	// be allowed to connect to the server, and all other connections will be
-	// rejected. The client will also refuse to connect to any server that isn't
-	// the original instance started by the client.
-	//
-	// In this mode of operation, the client generates a one-time use tls
-	// certificate, sends the public x.509 certificate to the new server, and
-	// the server generates a one-time use tls certificate, and sends the public
-	// x.509 certificate back to the client. These are used to authenticate all
-	// rpc connections between the client and server.
-	//
-	// Setting AutoMTLS to true implies that the server must support the
-	// protocol, and correctly negotiate the tls certificates, or a connection
-	// failure will result.
-	//
-	// The client should not set TLSConfig, nor should the server set a
-	// TLSProvider, because AutoMTLS implies that a new certificate and tls
-	// configuration will be generated at startup.
-	//
-	// You cannot Reattach to a server with this option enabled.
-	AutoMTLS bool
-}
-
-func (c *ClientConfig) toGo() *plugin.ClientConfig {
-	cfg := &plugin.ClientConfig{
-		HandshakeConfig:  c.HandshakeConfig,
-		Plugins:          map[string]plugin.Plugin{},
-		MinPort:          c.MinPort,
-		MaxPort:          c.MaxPort,
-		StartTimeout:     c.startTimeout,
-		Stderr:           c.Stderr,
-		SyncStdout:       c.SyncStdout,
-		SyncStderr:       c.SyncStderr,
-		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
-		//Logger:           nil,
-		AutoMTLS: c.AutoMTLS,
+// ClientPing returns an owned, empty string on success, or the error
+// message on failure. This is a plain string return, not an out_error
+// failure, matching the Python-level `client.ping() == ""` convention
+// tests assert.
+//
+//export ClientPing
+func ClientPing(handle C.uintptr_t) *C.char {
+	c, ok := clientFromHandle(handle)
+	if !ok {
+		return C.CString(invalidHandleErr)
 	}
-
-	if c.cmd != nil && c.cmd.Valid() {
-		cfg.Cmd = &exec.Cmd{
-			Path: c.cmd.Path,
-			Args: c.cmd.Args,
-			Env:  c.cmd.Env,
-			Dir:  c.cmd.Dir,
-		}
-	} else if c.reattach != nil {
-		cfg.Reattach = c.reattach
-	}
-	return cfg
-}
-
-// gopy:name cmd
-func (c *ClientConfig) Cmd() *Cmd {
-	if c.cmd == nil {
-		c.cmd = NewCmd()
-	}
-	return c.cmd
-}
-
-// gopy:name set_cmd
-func (c *ClientConfig) SetCmd(cmd *Cmd) {
-	c.cmd = cmd
-}
-
-// gopy:name reattach_config
-func (c *ClientConfig) ReattachConfig() *ReattachConfig {
-	if c == nil || c.reattach == nil {
-		return nil
-	}
-	return &ReattachConfig{c.reattach}
-}
-
-// gopy:name set_reattach_config
-func (c *ClientConfig) SetReattachConfig(cfg *ReattachConfig) {
-	if cfg == nil {
-		c.reattach = nil
-	} else {
-		c.reattach = cfg.ReattachConfig
-	}
-}
-
-// gopy:name start_timeout
-func (c *ClientConfig) StartTimeout() int64 {
-	return c.startTimeout.Milliseconds()
-}
-
-// gopy:name set_start_timeout
-func (c *ClientConfig) SetStartTimeout(msec int64) {
-	c.startTimeout = (time.Millisecond / time.Nanosecond) * time.Duration(msec)
-}
-
-type Client = plugin.Client
-
-func NewClient(cfg *ClientConfig) *plugin.Client {
-	return plugin.NewClient(cfg.toGo())
-}
-
-func ClientPing(client *Client) string {
-	proto, err := client.Client()
+	proto, err := c.Client()
 	if err != nil {
-		return err.Error()
+		return C.CString(err.Error())
 	}
 	if err = proto.Ping(); err != nil {
-		return err.Error()
+		return C.CString(err.Error())
 	}
-	return ""
+	return C.CString("")
 }
+
+//export ClientStart
+func ClientStart(handle C.uintptr_t, outNetwork **C.char, outAddress **C.char, outError **C.char) C.int {
+	c, ok := clientFromHandle(handle)
+	if !ok {
+		setOutError(outError, errors.New(invalidHandleErr))
+		return 1
+	}
+	addr, err := c.Start()
+	if err != nil {
+		setOutError(outError, err)
+		return 1
+	}
+	setOutString(outNetwork, addr.Network())
+	setOutString(outAddress, addr.String())
+	return 0
+}
+
+// ClientReattachConfig returns: 1 with all out params written if the
+// client has reattach info available, 0 (out params untouched) if not
+// (matches the underlying go-plugin contract: nil before the process has
+// been started), -1 with outError set for an invalid handle.
+//
+//export ClientReattachConfig
+func ClientReattachConfig(
+	handle C.uintptr_t,
+	outProtocol **C.char, outNetwork **C.char, outAddress **C.char,
+	outPid *C.int, outTest *C.int,
+	outError **C.char,
+) C.int {
+	c, ok := clientFromHandle(handle)
+	if !ok {
+		setOutError(outError, errors.New(invalidHandleErr))
+		return -1
+	}
+	reattach := c.ReattachConfig()
+	if reattach == nil {
+		return 0
+	}
+	setOutString(outProtocol, string(reattach.Protocol))
+	if reattach.Addr != nil {
+		setOutString(outNetwork, reattach.Addr.Network())
+		setOutString(outAddress, reattach.Addr.String())
+	}
+	if outPid != nil {
+		*outPid = C.int(reattach.Pid)
+	}
+	if outTest != nil {
+		if reattach.Test {
+			*outTest = 1
+		} else {
+			*outTest = 0
+		}
+	}
+	return 1
+}
+
+var _ net.Addr = simpleAddr{} // compile-time assertion: simpleAddr implements net.Addr

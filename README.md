@@ -95,8 +95,10 @@ See [hashicorp/go-plugin](https://github.com/hashicorp/go-plugin) for general pl
 system architecture.
 
 The host (client) python implementation uses a binding over `hashicorp/go-plugin` to load and
-manage the lifecycle of plugins as subprocesses. Bindings are generated using 
-[go-python/gopy](https://github.com/go-python/gopy).
+manage the lifecycle of plugins as subprocesses. The Go side is compiled as a plain OS shared
+library (`go build -buildmode=c-shared`) and called from Python via
+[`cffi`](https://cffi.readthedocs.io/). It never touches the CPython C API, so the compiled
+library works unmodified across Python versions, unlike a typical CPython extension module.
 
 The server (plugin) python implementation is a pure port of the equivalent Go library. This
 helps to extend support to Python plugins for more easily serving the plugin, syncing 
@@ -109,16 +111,14 @@ server implementation, but do not automatically gain these extended features.
 Building the pygo-plugin library requires a recent version of the [Go compiler](https://golang.org) (>= 1.24)
 and Python >= 3.9.
 
-The python development headers are required to compile the python extension module. On linux:
+A C compiler is required on Linux for `cgo` to build the shared library:
 
 ```
-sudo apt install libpython3-dev build-essential 
+sudo apt install build-essential
 ```
 
-T`gopy` and `goimports` do not need to be installed or put on `PATH` by hand. They're declared as
-[Go 1.24 tool dependencies](https://go.dev/doc/modules/managing-dependencies#tools) in `go.mod`, pinned to exact
-versions alongside the rest of this project's Go dependencies, and the build script installs them on demand into
-a private, temporary location the first time they're needed.
+No Python development headers are required: the compiled library is a plain OS shared library, not a CPython
+extension.
 
 For a one-shot dev setup (creates a virtualenv, installs pygo-plugin editable, runs the tests), run
 `./scripts/bootstrap.sh`. Otherwise, the same steps by hand:
@@ -128,7 +128,7 @@ For a one-shot dev setup (creates a virtualenv, installs pygo-plugin editable, r
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Install pygo-plugin (builds proto codegen + the Go->Python extension automatically)
+# Install pygo-plugin (builds proto codegen + the Go native shared library automatically)
 pip install .
 
 # or... to hack on the source, with pytest included

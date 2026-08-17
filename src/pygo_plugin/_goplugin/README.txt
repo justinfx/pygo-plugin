@@ -1,1 +1,1 @@
-This directory is populated by the generated python compiled extension, during build time.
+This directory is populated by the compiled go_plugin native shared library (libgoplugin.*), during build time.

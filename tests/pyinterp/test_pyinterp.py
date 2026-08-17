@@ -266,15 +266,15 @@ def test_pyinterp_exception_instantiate_custom_exceptions():
 def test_pyinterp_import_excludes_goplugin():
     # A plugin subprocess only ever needs pygo_plugin.plugin/.server (and,
     # for this plugin type, .pyinterp). It must never transitively import
-    # pygo_plugin.client, which pulls in the compiled gopy extension built
-    # for one specific CPython ABI. Verified in a fresh subprocess (not
+    # pygo_plugin.client, which loads the compiled go_plugin native shared
+    # library via pygo_plugin._native. Verified in a fresh subprocess (not
     # this test process, which may have already imported pygo_plugin.client
     # via other tests/fixtures).
     script = (
         "import sys\n"
         "import pygo_plugin.pyinterp.plugin\n"
         "assert 'pygo_plugin.client' not in sys.modules, sorted(sys.modules)\n"
-        "assert 'pygo_plugin._goplugin.go_plugin' not in sys.modules, sorted(sys.modules)\n"
+        "assert 'pygo_plugin._native' not in sys.modules, sorted(sys.modules)\n"
         "print('OK')\n"
     )
     import subprocess
@@ -284,26 +284,27 @@ def test_pyinterp_import_excludes_goplugin():
 
 
 def test_pyinterp_subprocess_without_goplugin_so():
-    # Stronger version of the test above: physically hide the compiled gopy
-    # extension so a fresh interpreter genuinely CANNOT import it, then
-    # confirm the plugin subprocess (a real, separate process) still starts
-    # and completes a normal round trip. The host process here is allowed
-    # to already have the extension loaded in memory (from module import
-    # time / other tests); only the host actually needs it, to launch and
-    # dispense the plugin subprocess in the first place.
+    # Stronger version of the test above: physically hide the compiled
+    # go_plugin native shared library so a fresh interpreter genuinely
+    # CANNOT load it, then confirm the plugin subprocess (a real, separate
+    # process) still starts and completes a normal round trip. The host
+    # process here is allowed to already have the library loaded in memory
+    # (from module import time / other tests); only the host actually
+    # needs it, to launch and dispense the plugin subprocess in the first
+    # place.
     # Force the host side's own (in-memory, already-loaded-from-disk) copy
-    # of the extension to be resolved *before* hiding it on disk below,
+    # of the library to be resolved *before* hiding it on disk below,
     # otherwise this process, not just the plugin subprocess, would fail to
-    # import it fresh, which is not what this test is checking.
+    # load it fresh, which is not what this test is checking.
     import pygo_plugin._goplugin as _goplugin_pkg
     import pygo_plugin.client  # noqa: F401
 
     ext_dir = os.path.dirname(_goplugin_pkg.__file__)
     ext_names = [
         name for name in os.listdir(ext_dir)
-        if name.startswith('_goplugin.') and name.endswith(('.so', '.pyd', '.dylib'))
+        if name.startswith('libgoplugin.') and name.endswith(('.so', '.dylib', '.dll'))
     ]
-    assert ext_names, "expected to find the compiled gopy extension under %s" % ext_dir
+    assert ext_names, "expected to find the compiled native library under %s" % ext_dir
 
     moved = []
     try:
