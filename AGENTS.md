@@ -121,11 +121,24 @@ build/install:
 
 `grpcio-tools` (imported/used only by `GrpcGenTool` above, never at runtime) is declared in
 `[build-system] requires`, not `[project.dependencies]`; this means a plain, isolated `pip install .` correctly
-provisions pip's own build venv with everything the custom commands need and just works. For local iteration,
-`pip install -e . --no-build-isolation` is still faster (skips recreating pip's build venv on every reinstall),
-but is no longer required the way it once was before `[build-system] requires` existed. `cffi` (how
-`pygo_plugin._native` loads the compiled library) is a genuine runtime dependency, declared in
-`[project.dependencies]` instead.
+provisions pip's own build venv with everything the custom commands need and just works. It's also declared in
+the `test` extra, for a different reason: `pip install -e . --no-build-isolation` skips that isolated build env
+and reuses the active venv instead, so `grpcio-tools` has to already be installed there for `grpc`/`go_build` to
+run at all. "Skips the `grpc` step" understates what actually happens if it's missing: setuptools (>=64) wraps
+customized `build_py` commands for editable installs in a compatibility shim that catches any exception the
+command raises, prints a `SetuptoolsDeprecationWarning` (only shown with `pip install -v`, invisible otherwise),
+and abandons the rest of that command entirely. Since `BuildPyCommand.run()` calls `grpc` before `go_build`, a
+missing `grpcio-tools` means `go_build` never runs either, not just `grpc`, an editable install "succeeds" with
+exit 0 and no visible warning, and the compiled native library is silently never built (or left stale from a
+previous build). This was confirmed empirically, not just read off setuptools' source: a from-scratch editable
+install without `grpcio-tools` present produced zero build output and an untouched `_goplugin/` directory; the
+same install with it present ran both `grpc` and `go_build` and rebuilt `libgoplugin.dylib`. Always install
+`--no-build-isolation` together with the `test` extra (`pip install -e ".[test]" --no-build-isolation`), never
+bare, for exactly this reason; see "Bootstrapping an environment" below, which only documents the `[test]` form.
+`cffi` (how `pygo_plugin._native` loads the compiled library) is a genuine runtime dependency, declared in
+`[project.dependencies]` instead; `grpcio` (the runtime gRPC library itself, as opposed to `grpcio-tools`'
+`protoc` code generator) is there too, since every real user of the package needs it regardless of whether
+they ever build or test.
 
 `setup.py` was ported off `distutils` to plain `setuptools` (Sept 2026 modernization) so it runs fine on
 Python 3.12+; `pkg_resources` (also gone from modern setuptools) was replaced with `importlib.resources` for
@@ -170,10 +183,11 @@ source .venv/bin/activate
 #    own isolated build venv via pyproject.toml's [build-system]
 #    requires, so this needs no other setup:
 pip install .
-# or, editable install for hacking on the source: faster to reinstall
-# since it skips recreating pip's isolated build venv each time:
-pip install -e . --no-build-isolation
-# with the test extra, if you also want pytest:
+# or, editable install for hacking on the source: faster to reinstall since
+# it skips recreating pip's isolated build venv each time. Always pair
+# --no-build-isolation with the test extra, never bare: it's what puts
+# grpcio-tools in the active venv, which the build now depends on being
+# there once the isolated build env is skipped (see "Build pipeline" above):
 pip install -e ".[test]" --no-build-isolation
 
 # Rebuild just the generated bindings after changing go_plugin/*.go or *.proto files

@@ -131,7 +131,9 @@ source .venv/bin/activate
 # Install pygo-plugin (builds proto codegen + the Go native shared library automatically)
 pip install .
 
-# or... to hack on the source, with pytest included
+# or... to hack on the source, with pytest and grpcio-tools included (grpcio-tools
+# is required here because --no-build-isolation skips pip's isolated build env,
+# where it would otherwise come from automatically)
 pip install -e ".[test]" --no-build-isolation
 # and rebuild the bindings after changing go_plugin/*.go or *.proto files
 python setup.py build_py  

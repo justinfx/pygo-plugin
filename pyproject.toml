@@ -40,7 +40,11 @@ dependencies = [
 Homepage = "https://github.com/justinfx/pygo-plugin"
 
 [project.optional-dependencies]
-test = ["pytest"]
+# grpcio-tools is also declared under [build-system] requires (for a plain
+# `pip install .`, which builds in an isolated env); repeated here because
+# --no-build-isolation skips that env, see AGENTS.md's "Build pipeline"
+# section for why it must be present in the active venv in that case.
+test = ["pytest", "grpcio-tools"]
 
 [tool.setuptools]
 zip-safe = false
